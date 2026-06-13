@@ -50,7 +50,7 @@ echo "==> Output: $OUT_DIR"
 
 # ─── Section 1: Environment ───────────────────────────────────────────────────
 
-echo "==> [1/9] Environment"
+echo "==> [1/10] Environment"
 WP_VERSION=$(wp core version 2>/dev/null || echo "unknown")
 PHP_VERSION=$(php -v 2>/dev/null | head -1 | awk '{print $2}' || echo "unknown")
 ACTIVE_THEME=$(wp theme list --status=active --field=name 2>/dev/null | head -1 || echo "unknown")
@@ -60,7 +60,7 @@ PLUGIN_COUNT=$(python3 -c "import json; print(len(json.load(open('$RAW_DIR/activ
 
 # ─── Section 2: Elementor inventory ───────────────────────────────────────────
 
-echo "==> [2/9] Elementor inventory"
+echo "==> [2/10] Elementor inventory"
 wp db query "SELECT post_type, COUNT(*) AS n FROM wp_postmeta JOIN wp_posts ON wp_postmeta.post_id = wp_posts.ID WHERE meta_key = '_elementor_data' GROUP BY post_type ORDER BY n DESC;" 2>/dev/null > "$RAW_DIR/elementor-counts.txt" || echo "" > "$RAW_DIR/elementor-counts.txt"
 
 ELEMENTOR_POST_COUNT=$(python3 -c "
@@ -109,7 +109,7 @@ fi
 
 # ─── Section 3: Distinct widget types + tier classification ───────────────────
 
-echo "==> [3/9] Widget types + classification"
+echo "==> [3/10] Widget types + classification"
 
 # WP eval extracts {widgetType: count} from _elementor_data JSON across all posts.
 wp eval '
@@ -175,7 +175,7 @@ read -r EASY_COUNT MEDIUM_COUNT HARD_COUNT REVIEW_COUNT < "$RAW_DIR/widget-tier-
 
 # ─── Section 4: Plugin classification ─────────────────────────────────────────
 
-echo "==> [4/9] Plugin classification"
+echo "==> [4/10] Plugin classification"
 RAW_DIR="$RAW_DIR" python3 > "$RAW_DIR/plugins-classified.tsv" <<'PYEOF'
 import os, json
 RAW = os.environ['RAW_DIR']
@@ -212,7 +212,7 @@ read -r UTILITY_PLUGIN_COUNT RENDERING_PLUGIN_COUNT ELEMENTOR_PLUGIN_COUNT < "$R
 
 # ─── Section 5: Performance baseline ──────────────────────────────────────────
 
-echo "==> [5/9] Performance baseline"
+echo "==> [5/10] Performance baseline"
 # WP 6.6+ migrated autoload values from yes/no → auto/on/off (NOT IN handles both schemas).
 AUTOLOAD_KB=$(wp eval 'global $wpdb; echo round($wpdb->get_var("SELECT SUM(LENGTH(option_value)) FROM {$wpdb->options} WHERE autoload NOT IN (\"no\", \"off\")") / 1024);' 2>/dev/null | tr -d '[:space:]' || echo "?")
 [[ -z "$AUTOLOAD_KB" ]] && AUTOLOAD_KB="?"
@@ -220,7 +220,7 @@ TTFB_HOME=$(curl -o /dev/null -s -w "%{time_starttransfer}" --max-time 10 "$SITE
 
 # ─── Section 6: SEO baseline ──────────────────────────────────────────────────
 
-echo "==> [6/9] SEO baseline"
+echo "==> [6/10] SEO baseline"
 SEO_PLUGIN=$(wp plugin list --status=active --field=name 2>/dev/null | grep -iE "yoast|rank-math|all-in-one-seo|seopress" | head -1 || echo "none")
 SITEMAP_COUNT=0
 for path in /sitemap_index.xml /sitemap.xml /wp-sitemap.xml; do
@@ -230,7 +230,7 @@ done
 
 # ─── Section 7: .htaccess artifacts ───────────────────────────────────────────
 
-echo "==> [7/9] .htaccess artifacts"
+echo "==> [7/10] .htaccess artifacts"
 HTACCESS_MARKERS=""
 if [[ -f ".htaccess" ]]; then
   # Match only migration-relevant markers, NOT the benign "# BEGIN WordPress" block
@@ -241,12 +241,12 @@ fi
 
 # ─── Section 8: Elementor custom CSS ──────────────────────────────────────────
 
-echo "==> [8/9] Elementor custom CSS"
+echo "==> [8/10] Elementor custom CSS"
 CUSTOM_CSS_BYTES=$(wp option get elementor_custom_css --format=json 2>/dev/null | wc -c | tr -d '[:space:]' || echo "0")
 
 # ─── Section 9: wp doctor (if installed) ──────────────────────────────────────
 
-echo "==> [9/9] wp doctor"
+echo "==> [9/10] wp doctor"
 DOCTOR_OUTPUT=""
 if wp package list 2>/dev/null | grep -q "wp-doctor"; then
   DOCTOR_OUTPUT=$(wp doctor check --all 2>&1 | head -40 || echo "")
@@ -254,13 +254,35 @@ else
   DOCTOR_OUTPUT="(wp-doctor not installed; skipped)"
 fi
 
+# ─── Section 10: Charset / collation legacy check ─────────────────────────────
+#
+# Elementor sites trend old; old WP installs often carry latin1 / utf8 (3-byte)
+# tables that break mojibake-safe migration. If any core table or column is on
+# a non-utf8mb4 collation, flag it — wp-charset skill handles the cleanup.
+
+echo "==> [10/10] Charset / collation"
+LEGACY_TABLE_COUNT=$(wp eval 'global $wpdb; $db = DB_NAME; $rows = $wpdb->get_results("SELECT TABLE_NAME, TABLE_COLLATION FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = \"$db\" AND TABLE_COLLATION IS NOT NULL AND TABLE_COLLATION NOT LIKE \"utf8mb4%\""); echo count($rows);' 2>/dev/null | tr -d '[:space:]' || echo "0")
+LEGACY_COLUMN_COUNT=$(wp eval 'global $wpdb; $db = DB_NAME; $rows = $wpdb->get_results("SELECT COUNT(*) AS n FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = \"$db\" AND COLLATION_NAME IS NOT NULL AND COLLATION_NAME NOT LIKE \"utf8mb4%\""); echo $rows[0]->n;' 2>/dev/null | tr -d '[:space:]' || echo "0")
+[[ -z "$LEGACY_TABLE_COUNT" ]] && LEGACY_TABLE_COUNT=0
+[[ -z "$LEGACY_COLUMN_COUNT" ]] && LEGACY_COLUMN_COUNT=0
+
+if [[ "$LEGACY_TABLE_COUNT" -gt 0 || "$LEGACY_COLUMN_COUNT" -gt 0 ]]; then
+  CHARSET_STATE="LEGACY"
+  CHARSET_PENALTY_HOURS=3
+else
+  CHARSET_STATE="CLEAN"
+  CHARSET_PENALTY_HOURS=0
+fi
+
 # ─── Time estimate (rough heuristic) ──────────────────────────────────────────
 
 ESTIMATE_HOURS=$(python3 -c "
 e=${EASY_COUNT:-0}; m=${MEDIUM_COUNT:-0}; h=${HARD_COUNT:-0}; r=${REVIEW_COUNT:-0}
 p=${ELEMENTOR_POST_COUNT:-0}
-# 5 min per easy widget, 30 min per medium, 2 hr per hard, 45 min per review-needed, plus 20 min/page overhead
-total_min = e*5 + m*30 + h*120 + r*45 + p*20
+charset_h=${CHARSET_PENALTY_HOURS:-0}
+# 5 min per easy widget, 30 min per medium, 2 hr per hard, 45 min per review-needed,
+# plus 20 min/page overhead, plus charset cleanup penalty if legacy collation detected.
+total_min = e*5 + m*30 + h*120 + r*45 + p*20 + charset_h*60
 print(round(total_min / 60))
 ")
 
@@ -346,6 +368,25 @@ Full list: see \`raw/plugins-classified.tsv\`.
 $DOCTOR_OUTPUT
 \`\`\`
 
+## Charset / collation
+
+- State: **$CHARSET_STATE**
+- Tables on non-utf8mb4 collation: $LEGACY_TABLE_COUNT
+- Columns on non-utf8mb4 collation: $LEGACY_COLUMN_COUNT
+
+EOF
+if [[ "$CHARSET_STATE" == "LEGACY" ]]; then
+  cat >> "$OUT_DIR/audit-report.md" <<EOF
+This site has legacy latin1 / utf8mb3 tables or columns. **Plan to clean these up BEFORE the Elementor migration**, otherwise mojibake (\`Ã©\`, \`â€™\`, etc.) can surface in content during the database round-trips. WP Block School cohort includes a pre-migration charset cleanup module using the \`wp-charset\` tooling (CP1252 pre-clean + binary round-trip → utf8mb4). Estimated added time: ~$CHARSET_PENALTY_HOURS hours.
+
+EOF
+else
+  cat >> "$OUT_DIR/audit-report.md" <<EOF
+All collations are on utf8mb4 — no charset cleanup needed before migration.
+
+EOF
+fi
+cat >> "$OUT_DIR/audit-report.md" <<EOF
 ## Raw output
 
 All wp-cli output preserved under \`raw/\` for verification.
@@ -375,6 +416,7 @@ Generated: $NOW
 | Plugins flagged for migration risk | $RENDERING_PLUGIN_COUNT |
 | Plugins that leave with Elementor | $ELEMENTOR_PLUGIN_COUNT |
 | Autoload bloat | ${AUTOLOAD_KB} KB |
+| Charset / collation | $CHARSET_STATE |
 
 ## What this means
 
@@ -391,6 +433,13 @@ EOF
 else
   cat >> "$OUT_DIR/migration-scorecard.md" <<EOF
 Your site has significant complexity — multiple hard-tier widgets, forms, or third-party Elementor-only plugins. A solo migration is risky without a clear playbook. Strongly consider the cohort or hiring help.
+EOF
+fi
+
+if [[ "$CHARSET_STATE" == "LEGACY" ]]; then
+  cat >> "$OUT_DIR/migration-scorecard.md" <<EOF
+
+⚠ **Legacy charset detected** ($LEGACY_TABLE_COUNT tables / $LEGACY_COLUMN_COUNT columns on non-utf8mb4 collation). Plan to clean this up BEFORE the Elementor migration or you'll get mojibake in your content. Time estimate above includes ~$CHARSET_PENALTY_HOURS hours for charset cleanup. The cohort handles this in a dedicated pre-migration module.
 EOF
 fi
 

@@ -14,6 +14,15 @@
 
 set -euo pipefail
 
+# Silence wp-cli's PHP deprecation noise on PHP 8.4+. WP_CLI_PHP_ARGS is read
+# by wp-cli's shell wrapper, but if `wp` is the phar invoked directly via its
+# shebang (common on Homebrew installs) the env var is ignored. Wrapping each
+# `wp` call as `php -d ... <wp-phar>` reliably suppresses noise.
+WP_BIN=$(command -v wp 2>/dev/null || echo "/opt/homebrew/bin/wp")
+wp() {
+  php -d error_reporting=0 -d display_errors=Off -d memory_limit=512M "$WP_BIN" "$@"
+}
+
 OUT_DIR="${1:-./audit-report}"
 RAW_DIR="$OUT_DIR/raw"
 mkdir -p "$RAW_DIR"
@@ -69,6 +78,31 @@ print(total)
 if [[ "$ELEMENTOR_POST_COUNT" == "0" ]]; then
   echo "    (no _elementor_data postmeta found — site is not Elementor-built)"
   ELEMENTOR_SITE=false
+  # Per SKILL.md decision rule: short-circuit with a 1-section report.
+  NOW=$(date -u +"%Y-%m-%d %H:%M UTC")
+  cat > "$OUT_DIR/audit-report.md" <<EOF
+# Audit report — $SITE_URL
+
+Generated: $NOW
+
+## Result
+
+This site has **no \`_elementor_data\` postmeta** — it is not Elementor-built. There is nothing to migrate off Elementor. If you intended to audit a different site, double-check the WP install root you ran this from.
+EOF
+  cat > "$OUT_DIR/migration-scorecard.md" <<EOF
+# Migration scorecard — $SITE_URL
+
+**Result:** Not an Elementor site. Nothing to migrate.
+
+If you intended to audit a different site, re-run the audit from that WP install root.
+
+Generated: $NOW
+EOF
+  echo ""
+  echo "✓ Audit complete (non-Elementor site)."
+  echo "  Report:    $OUT_DIR/audit-report.md"
+  echo "  Scorecard: $OUT_DIR/migration-scorecard.md"
+  exit 0
 else
   ELEMENTOR_SITE=true
 fi
@@ -122,11 +156,14 @@ for w, c, t in rows:
     print(f"{w}\t{c}\t{t}")
 PYEOF
 
-# Aggregate tier totals.
-read -r EASY_COUNT MEDIUM_COUNT HARD_COUNT REVIEW_COUNT < <(python3 <<PYEOF
+# Aggregate tier totals. Use a temp file (not process substitution) because bash's
+# heredoc parser collides with `< <(... <<EOF ...)` on some versions.
+RAW_DIR="$RAW_DIR" python3 > "$RAW_DIR/widget-tier-totals.txt" <<'PYEOF'
+import os
+RAW = os.environ['RAW_DIR']
 totals = {"EASY":0,"MEDIUM":0,"HARD":0,"REVIEW":0}
 try:
-    for line in open("$RAW_DIR/widget-classification.tsv"):
+    for line in open(f"{RAW}/widget-classification.tsv"):
         parts = line.strip().split("\t")
         if len(parts) < 3: continue
         totals[parts[2]] = totals.get(parts[2],0) + int(parts[1])
@@ -134,18 +171,19 @@ except FileNotFoundError:
     pass
 print(totals["EASY"], totals["MEDIUM"], totals["HARD"], totals["REVIEW"])
 PYEOF
-)
+read -r EASY_COUNT MEDIUM_COUNT HARD_COUNT REVIEW_COUNT < "$RAW_DIR/widget-tier-totals.txt"
 
 # ─── Section 4: Plugin classification ─────────────────────────────────────────
 
 echo "==> [4/9] Plugin classification"
-python3 > "$RAW_DIR/plugins-classified.tsv" <<PYEOF
-import json
+RAW_DIR="$RAW_DIR" python3 > "$RAW_DIR/plugins-classified.tsv" <<'PYEOF'
+import os, json
+RAW = os.environ['RAW_DIR']
 UTILITY = {"wordfence","yoast","rank-math","wp-super-cache","w3-total-cache","wp-rocket","updraftplus","backupbuddy","akismet","jetpack","seo-by-rank-math","wp-fastest-cache"}
 ELEMENTOR_ONLY = {"elementor","elementor-pro","essential-addons-for-elementor-lite","exclusive-addons-for-elementor","happy-elementor-addons","premium-addons-for-elementor","crocoblock-jet-engine","jet-elements","jet-engine","jet-menu","jet-popup","jet-smart-filters","jet-tabs","jet-tricks","unlimited-elements-for-elementor","powerpack-elements","elements-kit","wp-mega-menu-pro"}
 
 try:
-    plugins = json.load(open("$RAW_DIR/active-plugins.json"))
+    plugins = json.load(open(f"{RAW}/active-plugins.json"))
 except (FileNotFoundError, json.JSONDecodeError):
     plugins = []
 
@@ -157,10 +195,12 @@ for p in plugins:
     print(f"{slug}\t{p.get('version','')}\t{tier}")
 PYEOF
 
-read -r UTILITY_PLUGIN_COUNT RENDERING_PLUGIN_COUNT ELEMENTOR_PLUGIN_COUNT < <(python3 <<PYEOF
+RAW_DIR="$RAW_DIR" python3 > "$RAW_DIR/plugin-tier-totals.txt" <<'PYEOF'
+import os
+RAW = os.environ['RAW_DIR']
 totals = {"UTILITY":0,"RENDERING_OWNER_OR_UNKNOWN":0,"ELEMENTOR_ONLY":0}
 try:
-    for line in open("$RAW_DIR/plugins-classified.tsv"):
+    for line in open(f"{RAW}/plugins-classified.tsv"):
         parts = line.strip().split("\t")
         if len(parts) >= 3:
             totals[parts[2]] = totals.get(parts[2],0) + 1
@@ -168,12 +208,14 @@ except FileNotFoundError:
     pass
 print(totals["UTILITY"], totals["RENDERING_OWNER_OR_UNKNOWN"], totals["ELEMENTOR_ONLY"])
 PYEOF
-)
+read -r UTILITY_PLUGIN_COUNT RENDERING_PLUGIN_COUNT ELEMENTOR_PLUGIN_COUNT < "$RAW_DIR/plugin-tier-totals.txt"
 
 # ─── Section 5: Performance baseline ──────────────────────────────────────────
 
 echo "==> [5/9] Performance baseline"
-AUTOLOAD_KB=$(wp db query "SELECT ROUND(SUM(LENGTH(option_value))/1024) FROM wp_options WHERE autoload = 'yes';" --skip-column-names 2>/dev/null | tr -d '[:space:]' || echo "?")
+# WP 6.6+ migrated autoload values from yes/no → auto/on/off (NOT IN handles both schemas).
+AUTOLOAD_KB=$(wp eval 'global $wpdb; echo round($wpdb->get_var("SELECT SUM(LENGTH(option_value)) FROM {$wpdb->options} WHERE autoload NOT IN (\"no\", \"off\")") / 1024);' 2>/dev/null | tr -d '[:space:]' || echo "?")
+[[ -z "$AUTOLOAD_KB" ]] && AUTOLOAD_KB="?"
 TTFB_HOME=$(curl -o /dev/null -s -w "%{time_starttransfer}" --max-time 10 "$SITE_URL/" 2>/dev/null || echo "?")
 
 # ─── Section 6: SEO baseline ──────────────────────────────────────────────────
@@ -191,9 +233,11 @@ done
 echo "==> [7/9] .htaccess artifacts"
 HTACCESS_MARKERS=""
 if [[ -f ".htaccess" ]]; then
-  HTACCESS_MARKERS=$(grep -oE "LSCACHE|LiteSpeed|NON_LSCACHE|dh-|# BEGIN [A-Z_]+" .htaccess 2>/dev/null | sort -u | tr '\n' ',' || echo "")
+  # Match only migration-relevant markers, NOT the benign "# BEGIN WordPress" block
+  # which exists on every WP install.
+  HTACCESS_MARKERS=$(grep -oE "LSCACHE|LiteSpeed|NON_LSCACHE|# BEGIN dh-|# BEGIN GeneratedPress|# BEGIN Elementor|# BEGIN AIOSEO" .htaccess 2>/dev/null | sort -u | tr '\n' ',' || echo "")
 fi
-[[ -z "$HTACCESS_MARKERS" ]] && HTACCESS_MARKERS="(none)"
+[[ -z "$HTACCESS_MARKERS" ]] && HTACCESS_MARKERS="(none — only standard WP rewrites)"
 
 # ─── Section 8: Elementor custom CSS ──────────────────────────────────────────
 
@@ -213,8 +257,8 @@ fi
 # ─── Time estimate (rough heuristic) ──────────────────────────────────────────
 
 ESTIMATE_HOURS=$(python3 -c "
-e=$EASY_COUNT; m=$MEDIUM_COUNT; h=$HARD_COUNT; r=$REVIEW_COUNT
-p=$ELEMENTOR_POST_COUNT
+e=${EASY_COUNT:-0}; m=${MEDIUM_COUNT:-0}; h=${HARD_COUNT:-0}; r=${REVIEW_COUNT:-0}
+p=${ELEMENTOR_POST_COUNT:-0}
 # 5 min per easy widget, 30 min per medium, 2 hr per hard, 45 min per review-needed, plus 20 min/page overhead
 total_min = e*5 + m*30 + h*120 + r*45 + p*20
 print(round(total_min / 60))

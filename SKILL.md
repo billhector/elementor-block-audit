@@ -26,6 +26,10 @@ This is the FREE giveaway / mini-course deliverable for WP Block School. It is u
 
 If preconditions fail: halt, explain, do NOT guess past them.
 
+## Before migrating — pre-migration checklist
+
+This skill audits a site but does NOT migrate it. Before anyone moves from "I have an audit scorecard" to "I'm starting the migration", they should run through `references/pre-migration-checklist.md` — local-dev environment, backups, staging copy, plugin/theme decisions, time block, acceptance criteria, red flags. Cohort 1 of WP Block School uses this as week-1 onboarding; share it with audit recipients who are about to start a migration.
+
 ## What the audit produces
 
 A single `audit-report.md` plus a one-page `migration-scorecard.md`. The scorecard is the prospect-facing artifact — concise enough to attach to a sales-page CTA or email.

@@ -113,6 +113,7 @@ echo "==> [3/10] Widget types + classification"
 
 # WP eval extracts {widgetType: count} from _elementor_data JSON across all posts.
 wp eval '
+global $wpdb;
 $rows = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = \"_elementor_data\" LIMIT 5000");
 $types = [];
 foreach ( $rows as $row ) {

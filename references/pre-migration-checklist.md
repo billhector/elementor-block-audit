@@ -2,7 +2,7 @@
 
 Run through this BEFORE you touch the production site or commit to a timeline. Most Elementor migrations that fail, fail because one of these wasn't in place.
 
-Cohort 1 (WP Block School): **Mac or Linux only.** Windows users need WSL2 — see "Operating system" below.
+**Mac or Linux only.** Windows users need WSL2 — see "Operating system" below.
 
 ---
 
@@ -10,7 +10,7 @@ Cohort 1 (WP Block School): **Mac or Linux only.** Windows users need WSL2 — s
 
 ### Local development environment
 
-- [ ] **Local by Flywheel** installed and working. (Alternative: DevKinsta, Studio. Local is what the cohort + skills are tested against.)
+- [ ] **Local by Flywheel** installed and working. (Alternative: DevKinsta, Studio. Local is what the skills are tested against.)
 - [ ] You can spin up a new blank WordPress site in <2 minutes.
 - [ ] You can open a site's WP files in your editor.
 
@@ -46,7 +46,7 @@ Cohort 1 (WP Block School): **Mac or Linux only.** Windows users need WSL2 — s
 
 ### Operating system
 
-- [ ] **Mac or Linux.** The migration skills + fixture-sandbox + most WP-CLI workflows assume Unix. Windows users need WSL2 (Ubuntu under WSL2 is the supported path). Native Windows + Git Bash is NOT supported by the cohort 1 toolchain.
+- [ ] **Mac or Linux.** The migration skills + fixture-sandbox + most WP-CLI workflows assume Unix. Windows users need WSL2 (Ubuntu under WSL2 is the supported path). Native Windows + Git Bash is NOT supported by this toolchain.
 
 ### Inventory + planning
 
@@ -106,4 +106,4 @@ Move to the migration playbook:
 
 ---
 
-*Maintained alongside [elementor-block-audit](https://github.com/billhector/elementor-block-audit). If you're going through the WP Block School cohort, this checklist is part of week 1 onboarding.*
+*Maintained alongside [elementor-block-audit](https://github.com/billhector/elementor-block-audit).*

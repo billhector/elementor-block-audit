@@ -378,7 +378,7 @@ $DOCTOR_OUTPUT
 EOF
 if [[ "$CHARSET_STATE" == "LEGACY" ]]; then
   cat >> "$OUT_DIR/audit-report.md" <<EOF
-This site has legacy latin1 / utf8mb3 tables or columns. **Plan to clean these up BEFORE the Elementor migration**, otherwise mojibake (\`Ã©\`, \`â€™\`, etc.) can surface in content during the database round-trips. WP Block School cohort includes a pre-migration charset cleanup module using the \`wp-charset\` tooling (CP1252 pre-clean + binary round-trip → utf8mb4). Estimated added time: ~$CHARSET_PENALTY_HOURS hours.
+This site has legacy latin1 / utf8mb3 tables or columns. **Plan to clean these up BEFORE the Elementor migration**, otherwise mojibake (\`Ã©\`, \`â€™\`, etc.) can surface in content during the database round-trips. Use the \`wp-charset\` tooling for this (CP1252 pre-clean + binary round-trip → utf8mb4). Estimated added time: ~$CHARSET_PENALTY_HOURS hours.
 
 EOF
 else
@@ -429,18 +429,18 @@ Your site is mostly built from widgets that map cleanly to core WordPress blocks
 EOF
 elif [[ "$DIFFICULTY" == "MIXED" ]]; then
   cat >> "$OUT_DIR/migration-scorecard.md" <<EOF
-Your site is migratable but not trivial. You have some widgets that need pattern rebuilds or custom blocks. Plan for ~$ESTIMATE_HOURS hours of focused work, or join the cohort to compress it into a structured 8-week sprint with help.
+Your site is migratable but not trivial. You have some widgets that need pattern rebuilds or custom blocks. Plan for ~$ESTIMATE_HOURS hours of focused work,.
 EOF
 else
   cat >> "$OUT_DIR/migration-scorecard.md" <<EOF
-Your site has significant complexity — multiple hard-tier widgets, forms, or third-party Elementor-only plugins. A solo migration is risky without a clear playbook. Strongly consider the cohort or hiring help.
+Your site has significant complexity — multiple hard-tier widgets, forms, or third-party Elementor-only plugins. A solo migration is risky without a clear playbook. Strongly consider hiring help.
 EOF
 fi
 
 if [[ "$CHARSET_STATE" == "LEGACY" ]]; then
   cat >> "$OUT_DIR/migration-scorecard.md" <<EOF
 
-⚠ **Legacy charset detected** ($LEGACY_TABLE_COUNT tables / $LEGACY_COLUMN_COUNT columns on non-utf8mb4 collation). Plan to clean this up BEFORE the Elementor migration or you'll get mojibake in your content. Time estimate above includes ~$CHARSET_PENALTY_HOURS hours for charset cleanup. The cohort handles this in a dedicated pre-migration module.
+⚠ **Legacy charset detected** ($LEGACY_TABLE_COUNT tables / $LEGACY_COLUMN_COUNT columns on non-utf8mb4 collation). Plan to clean this up BEFORE the Elementor migration or you'll get mojibake in your content. Time estimate above includes ~$CHARSET_PENALTY_HOURS hours for charset cleanup.
 EOF
 fi
 
@@ -452,13 +452,6 @@ cat >> "$OUT_DIR/migration-scorecard.md" <<EOF
 |---|---|---|
 | DIY solo | ~$ESTIMATE_HOURS hours | Medium-high if you have HARD widgets or unknown plugins |
 | Hire a freelancer | ~$((ESTIMATE_HOURS * 75))-$((ESTIMATE_HOURS * 150)) at \$75-\$150/hr | Variable — quality depends on the dev |
-| **WP Block School cohort (8 weeks)** | Built-in pace + support | Low — structured playbook + office hours |
-
-## Next step
-
-- New to the method? Start with the [free mini-course](https://wpblockschool.com/mini).
-- Ready to commit? [Join cohort #1](https://wpblockschool.com/cohort).
-- Want a second opinion on this scorecard? Reply to your audit email and we'll take a look.
 
 ---
 

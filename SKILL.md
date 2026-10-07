@@ -1,6 +1,6 @@
 ---
 name: elementor-block-audit
-description: Read-only audit of a WordPress + Elementor site. Produces a structured migration scorecard — every page inventoried, every Elementor widget classified easy/medium/hard for block-theme migration, plugins classified (utility / rendering-owner / Elementor-only), performance and SEO baselines, total time estimate. Free lead-magnet companion to elementor-block-migration. Triggers on prompts like "audit my Elementor site", "/elementor-block-audit <URL>", "is my site migratable", "how much work to leave Elementor", "Elementor migration scorecard", or when a prospect runs the wpblockschool.com audit form. Do NOT use to actually migrate (that is elementor-block-migration); this is read-only diagnosis.
+description: Read-only audit of a WordPress + Elementor site. Produces a structured migration scorecard — every page inventoried, every Elementor widget classified easy/medium/hard for block-theme migration, plugins classified (utility / rendering-owner / Elementor-only), performance and SEO baselines, total time estimate. Read-only companion to elementor-block-migration. Triggers on prompts like "audit my Elementor site", "/elementor-block-audit <URL>", "is my site migratable", "how much work to leave Elementor", "Elementor migration scorecard". Do NOT use to actually migrate (that is elementor-block-migration); this is read-only diagnosis.
 version: 1.0.0
 ---
 
@@ -8,13 +8,12 @@ version: 1.0.0
 
 A non-destructive read-only audit of a WordPress + Elementor site. Inventories every page, classifies every Elementor widget against block-theme equivalents, classifies every plugin by migration risk, captures performance + SEO baselines, and produces a one-page migration scorecard.
 
-This is the FREE giveaway / mini-course deliverable for WP Block School. It is upstream of `elementor-block-migration` which actually does the migration. Audit = read only. Migration = read + write.
+Originally the free lead-magnet for WP Block School (project archived 2026-10-07; CTAs removed). It is upstream of `elementor-block-migration` which actually does the migration. Audit = read only. Migration = read + write.
 
 ## Who runs this
 
 | Audience | Trigger |
 |---|---|
-| Prospects evaluating WP Block School | Audit form on wpblockschool.com, returns this skill running against their URL |
 | Solo devs deciding Elementor exit timing | "audit my Elementor site", "is my site migratable", "/elementor-block-audit" |
 | Bill, scoping client work | "scope X site for migration" |
 
@@ -28,7 +27,7 @@ If preconditions fail: halt, explain, do NOT guess past them.
 
 ## Before migrating — pre-migration checklist
 
-This skill audits a site but does NOT migrate it. Before anyone moves from "I have an audit scorecard" to "I'm starting the migration", they should run through `references/pre-migration-checklist.md` — local-dev environment, backups, staging copy, plugin/theme decisions, time block, acceptance criteria, red flags. Cohort 1 of WP Block School uses this as week-1 onboarding; share it with audit recipients who are about to start a migration.
+This skill audits a site but does NOT migrate it. Before anyone moves from "I have an audit scorecard" to "I'm starting the migration", they should run through `references/pre-migration-checklist.md` — local-dev environment, backups, staging copy, plugin/theme decisions, time block, acceptance criteria, red flags. Share it with anyone about to start a migration.
 
 ## What the audit produces
 
@@ -97,10 +96,6 @@ For every distinct widget type found, classify:
 |---|---|---|
 | DIY solo | <N> hours | Medium-high if you have HARD widgets |
 | Hire a freelancer | <$N> at $<rate>/hr | Variable — quality depends on dev |
-| **WP Block School cohort (8 weeks)** | Done in cohort #1 timeline | Low — built-in support |
-
-## Next step
-Reading this report cold? Start with the [WP Block School free mini-course](https://wpblockschool.com/mini). Ready to commit? [Join cohort #1](https://wpblockschool.com/cohort).
 ```
 
 ## Audit script
@@ -188,8 +183,8 @@ If a widget type isn't in this table, default to MEDIUM and flag for human revie
 
 ## Notes
 
-- This skill is the **free lead-magnet** for WP Block School. Output should always end with a soft CTA to either the free mini-course (low-friction) or the paid cohort (high-intent prospects). Don't make the CTA pushy — the scorecard's numbers should speak for themselves.
-- When the migration skill (`elementor-block-migration`) updates its widget-classification logic or audit script, mirror the relevant changes here. Initially the two skills duplicate audit logic (strict-subset architecture, locked 2026-06-12); refactor to a shared lib post-cohort #1.
+- No CTA. The WP Block School funnel (mini-course + cohort) was archived 2026-10-07 and its links are dead; don't add them back. The scorecard ends at the time-estimate table.
+- When the migration skill (`elementor-block-migration`) updates its widget-classification logic or audit script, mirror the relevant changes here. Initially the two skills duplicate audit logic (strict-subset architecture, locked 2026-06-12); refactor to a shared lib later.
 
 ---
 
